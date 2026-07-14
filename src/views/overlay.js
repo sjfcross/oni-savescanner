@@ -171,16 +171,17 @@ export function mountOverlay(root, data) {
 
   function showTip(b, px, py) {
     const term = currentTerm();
-    const rows = b.items.slice(0, 9).map((it) => {
+    const rows = b.items.map((it) => {
       const hit = term && norm(it.name).includes(term);
       return `<li${hit ? ' class="hit"' : ""}><span>${it.name}</span><span class="qty">${fmtKg(it.kg)}</span></li>`;
     }).join("");
-    const more = b.items.length > 9 ? `<li class="more">+${b.items.length - 9} more…</li>` : "";
     const empty = b.items.length ? "" : '<li class="more">empty</li>';
+    // Split into two columns once the list gets long so the whole thing stays on screen.
+    const cols = b.items.length > 14 ? " cols" : "";
     tip.innerHTML = `<div class="th"><span class="tname">${binTitle(b)}</span>` +
       `<span class="tpos mono">${b.x}, ${b.y}</span></div>` +
       `<div class="qty mono" style="margin-bottom:4px">${b.category} · ${fmtKg(b.totalKg)}</div>` +
-      `<ul>${rows}${more}${empty}</ul>`;
+      `<ul class="${cols}">${rows}${empty}</ul>`;
     tip.style.display = "block";
     const tw = tip.offsetWidth, th = tip.offsetHeight, W = stage.clientWidth, H = stage.clientHeight;
     let x = px + 14, y = py + 14;
