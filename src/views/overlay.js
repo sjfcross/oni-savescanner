@@ -2,6 +2,24 @@
 // from the { meta, boxes, buildings } object produced by extractBoxes().
 // Ported from the standalone build-overlay.mjs client script; scoped to `root`.
 
+// Building sprites (bundled + fingerprinted by Vite). Keyed by container category.
+// Categories without a sprite (Ration Box, Critter Drop-Off) fall back to a colored dot.
+import spriteBin from "../sprites/Storage_Bin_Sprite.webp";
+import spriteSmart from "../sprites/Smart_Storage_Bin_Sprite.webp";
+import spriteFridge from "../sprites/Refrigerator_Sprite.webp";
+import spriteGas from "../sprites/Gas_Reservoir_Sprite.webp";
+import spriteLiquid from "../sprites/Liquid_Reservoir_Sprite.webp";
+import spriteDispenser from "../sprites/Automatic_Dispenser_Sprite.webp";
+
+const SPRITE_SRC = {
+  "Storage Bin": spriteBin,
+  "Smart Storage Bin": spriteSmart,
+  "Refrigerator": spriteFridge,
+  "Gas Reservoir": spriteGas,
+  "Liquid Reservoir": spriteLiquid,
+  "Object Dispenser": spriteDispenser,
+};
+
 const CATCOLORS = {
   "Storage Bin": "#3fd0c4", "Smart Storage Bin": "#5ad1ff", "Refrigerator": "#7ee0a0",
   "Liquid Reservoir": "#5aa0ff", "Gas Reservoir": "#c79bff", "Ration Box": "#7ee0a0",
@@ -48,6 +66,18 @@ export function mountOverlay(root, data) {
   const worldW = (B.maxX - B.minX) + 4, worldH = (B.maxY - B.minY) + 4;
   const maxBin = Math.max(...boxes.map((b) => b.totalKg), 1);
 
+  // Preload the building sprites; redraw as each arrives so markers pop in.
+  const sprites = {}; // category -> HTMLImageElement
+  for (const [cat, src] of Object.entries(SPRITE_SRC)) {
+    const img = new Image();
+    img.onload = () => draw();
+    img.src = src;
+    sprites[cat] = img;
+  }
+  // Target on-screen sprite height, in px: ~2.6 world cells, but never smaller than 15px
+  // (so bins stay visible when zoomed out) — this is what makes zoom scale the icons.
+  const spriteH = () => Math.max(15, 2.6 * view.scale);
+
   let view = { scale: 1, ox: 0, oy: 0 }, fit = { scale: 1, ox: 0, oy: 0 };
   function computeFit() {
     const w = stage.clientWidth, h = stage.clientHeight;
@@ -87,25 +117,46 @@ export function mountOverlay(root, data) {
     for (const [bx, by] of buildings) ctx.fillRect(sx(bx) - ps / 2, sy(by) - ps / 2, ps, ps);
 
     const term = currentTerm();
-    for (const b of boxes) {
+    const H = spriteH();
+    // Draw hits last so their glow/ring sits on top of neighbors.
+    const order = [...boxes].sort((a, b) => (boxMatches(a, term) != null) - (boxMatches(b, term) != null));
+    for (const b of order) {
       const x = sx(b.x), y = sy(b.y);
-      const matchKg = boxMatches(b, term), isHit = matchKg != null, dimmed = term && !isHit;
-      const r = Math.max(3.2, 3 + Math.sqrt(b.totalKg / maxBin) * 7) * Math.min(1, view.scale / fit.scale * 0.9 + 0.3);
-      if (isHit) { ctx.beginPath(); ctx.arc(x, y, r + 6, 0, 7); ctx.fillStyle = "rgba(244,169,76,0.16)"; ctx.fill(); }
-      ctx.beginPath(); ctx.arc(x, y, r, 0, 7);
-      ctx.fillStyle = dimmed ? "rgba(120,140,150,0.16)" : (isHit ? "#f4a94c" : catColor(b.category));
-      ctx.globalAlpha = dimmed ? 0.5 : 1; ctx.fill(); ctx.globalAlpha = 1;
-      ctx.lineWidth = (selected === b) ? 2.5 : 1;
-      ctx.strokeStyle = (selected === b) ? "#fff" : "rgba(0,0,0,0.45)"; ctx.stroke();
+      const isHit = boxMatches(b, term) != null, dimmed = term && !isHit, sel = selected === b;
+      const img = sprites[b.category];
+      const ready = img && img.complete && img.naturalWidth;
+
+      if (ready) {
+        const h = H, w = H * (img.naturalWidth / img.naturalHeight);
+        if (isHit) { ctx.beginPath(); ctx.arc(x, y, Math.max(w, h) / 2 + 7, 0, 7); ctx.fillStyle = "rgba(244,169,76,0.20)"; ctx.fill(); }
+        ctx.globalAlpha = dimmed ? 0.3 : 1;
+        ctx.drawImage(img, x - w / 2, y - h / 2, w, h);
+        ctx.globalAlpha = 1;
+        if (sel || isHit) {
+          ctx.lineWidth = sel ? 2.5 : 2;
+          ctx.strokeStyle = sel ? "#fff" : "#f4a94c";
+          const pad = 2;
+          ctx.strokeRect(x - w / 2 - pad, y - h / 2 - pad, w + 2 * pad, h + 2 * pad);
+        }
+      } else {
+        // No sprite for this category (Ration Box, Critter Drop-Off) or not loaded yet.
+        const r = Math.max(3.2, H * 0.32);
+        if (isHit) { ctx.beginPath(); ctx.arc(x, y, r + 6, 0, 7); ctx.fillStyle = "rgba(244,169,76,0.18)"; ctx.fill(); }
+        ctx.beginPath(); ctx.arc(x, y, r, 0, 7);
+        ctx.fillStyle = dimmed ? "rgba(120,140,150,0.16)" : (isHit ? "#f4a94c" : catColor(b.category));
+        ctx.globalAlpha = dimmed ? 0.5 : 1; ctx.fill(); ctx.globalAlpha = 1;
+        ctx.lineWidth = sel ? 2.5 : 1;
+        ctx.strokeStyle = sel ? "#fff" : "rgba(0,0,0,0.45)"; ctx.stroke();
+      }
     }
   }
 
   function binAt(mx, my) {
+    const rad = spriteH() * 0.55; // roughly the sprite half-extent
     let best = null, bd = 1e9;
     for (const b of boxes) {
       const dx = sx(b.x) - mx, dy = sy(b.y) - my, d = dx * dx + dy * dy;
-      const r = Math.max(3.2, 3 + Math.sqrt(b.totalKg / maxBin) * 7) + 3;
-      if (d < r * r && d < bd) { bd = d; best = b; }
+      if (d < rad * rad && d < bd) { bd = d; best = b; }
     }
     return best;
   }
@@ -243,7 +294,10 @@ export function mountOverlay(root, data) {
   const cats = [...new Set(boxes.map((b) => b.category))];
   $("legend").innerHTML = cats.map((c) => {
     const n = boxes.filter((b) => b.category === c).length;
-    return `<span><i class="dot" style="background:${catColor(c)}"></i>${c} (${n})</span>`;
+    const icon = SPRITE_SRC[c]
+      ? `<img class="lgs" src="${SPRITE_SRC[c]}" alt="" />`
+      : `<i class="dot" style="background:${catColor(c)}"></i>`;
+    return `<span>${icon}${c} (${n})</span>`;
   }).join("");
 
   const onResize = () => { const k = view.scale / fit.scale; computeFit(); view.scale = fit.scale * k; draw(); };
