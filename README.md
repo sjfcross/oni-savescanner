@@ -1,4 +1,6 @@
-# ONI Save Scanner
+# Storage Scanner
+
+A save viewer for [Oxygen Not Included](https://www.klei.com/games/oxygen-not-included).
 
 **Live:** https://oni-savescanner.netlify.app
 
