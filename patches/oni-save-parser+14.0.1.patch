@@ -1,0 +1,29 @@
+diff --git a/node_modules/oni-save-parser/lib/parser/types.js b/node_modules/oni-save-parser/lib/parser/types.js
+index d12b166..74b9bfb 100644
+--- a/node_modules/oni-save-parser/lib/parser/types.js
++++ b/node_modules/oni-save-parser/lib/parser/types.js
+@@ -1,9 +1,8 @@
+ "use strict";
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.isMetaInstruction = void 0;
+-const util_1 = require("util");
+ function isMetaInstruction(inst) {
+-    return util_1.isObject(inst) && !!inst.isMeta;
++    return (typeof inst === "object" && inst !== null) && !!inst.isMeta;
+ }
+ exports.isMetaInstruction = isMetaInstruction;
+ //# sourceMappingURL=types.js.map
+\ No newline at end of file
+diff --git a/node_modules/oni-save-parser/lib/save-structure/version-validator.js b/node_modules/oni-save-parser/lib/save-structure/version-validator.js
+index 788103c..98d7d6e 100644
+--- a/node_modules/oni-save-parser/lib/save-structure/version-validator.js
++++ b/node_modules/oni-save-parser/lib/save-structure/version-validator.js
+@@ -2,7 +2,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.E_VERSION_MINOR = exports.E_VERSION_MAJOR = exports.validateVersion = exports.CURRENT_VERSION_MINOR = exports.CURRENT_VERSION_MAJOR = void 0;
+ exports.CURRENT_VERSION_MAJOR = 7;
+-exports.CURRENT_VERSION_MINOR = [31];
++exports.CURRENT_VERSION_MINOR = [31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45];
+ function validateVersion(major, minor, strictness = "minor") {
+     if (!matchVersion(major, exports.CURRENT_VERSION_MAJOR) ||
+         (strictness == "minor" && !matchVersion(minor, exports.CURRENT_VERSION_MINOR))) {
