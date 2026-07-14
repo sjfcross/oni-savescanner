@@ -118,8 +118,16 @@ export function mountOverlay(root, data) {
 
     const term = currentTerm();
     const H = spriteH();
-    // Draw hits last so their glow/ring sits on top of neighbors.
-    const order = [...boxes].sort((a, b) => (boxMatches(a, term) != null) - (boxMatches(b, term) != null));
+    // Painter's order so overlap is consistent, not arbitrary save order:
+    //   1. hits drawn last (glow/ring on top of neighbors)
+    //   2. higher world-y first → lower-on-screen sprites drawn in front (occlude those behind)
+    //   3. left-to-right within a row
+    const order = [...boxes].sort((a, b) => {
+      const ha = boxMatches(a, term) != null, hb = boxMatches(b, term) != null;
+      if (ha !== hb) return ha ? 1 : -1;
+      if (a.y !== b.y) return b.y - a.y;
+      return a.x - b.x;
+    });
     for (const b of order) {
       const x = sx(b.x), y = sy(b.y);
       const isHit = boxMatches(b, term) != null, dimmed = term && !isHit, sel = selected === b;
